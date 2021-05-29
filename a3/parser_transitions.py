@@ -33,6 +33,9 @@ class PartialParse(object):
         ### Note: If you need to use the sentence object to initialize anything, make sure to not directly 
         ###       reference the sentence object.  That is, remember to NOT modify the sentence object. 
 
+        self.stack = ["ROOT"]
+        self.buffer = sentence[:] # shallow copy
+        self.dependencies = []
 
         ### END YOUR CODE
 
@@ -52,6 +55,17 @@ class PartialParse(object):
         ###         2. Left Arc
         ###         3. Right Arc
 
+        if transition == "S" :
+            self.stack.append(self.buffer.pop(0))
+        else :
+            x = self.stack.pop()
+            y = self.stack.pop()
+
+            if transition == "RA" :
+                x, y = y, x
+
+            self.dependencies.append((x, y))
+            self.stack.append(x)
 
         ### END YOUR CODE
 
@@ -103,9 +117,20 @@ def minibatch_parse(sentences, model, batch_size):
     ###             to remove objects from the `unfinished_parses` list. This will free the underlying memory that
     ###             is being accessed by `partial_parses` and may cause your code to crash.
 
+    partials = [PartialParse(sentence) for sentence in sentences]
+    unfinished_parses = partials[:]
 
+    while unfinished_parses : 
+        minibatch = unfinished_parses[ : batch_size]
+        outs = model.predict(minibatch)
+
+        for transition, partial in zip(outs, minibatch) :
+            partial.parse_step(transition)
+
+        unfinished_parses[:] = [p for p in unfinished_parses if len(p.stack)!=1 or len(p.buffer)!=0]
     ### END YOUR CODE
 
+    dependencies = [p.dependencies for p in partials]
     return dependencies
 
 
